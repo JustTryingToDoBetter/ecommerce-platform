@@ -8,6 +8,7 @@ from app.models.product import Product
 from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse, ProductList
 from app.utils.exceptions import NotFoundException
 from app.models.user import User
+from app.services.auth import get_current_superuser
 from app.config import get_settings
 settings = get_settings()
 router = APIRouter()
@@ -16,22 +17,14 @@ router = APIRouter()
 @router.post("/", response_model=ProductResponse, status_code=201)
 async def create_product(
     product_data: ProductCreate,
+    current_user: User = Depends(get_current_superuser),
 ):
     """Create a new product."""
     product = Product(**product_data.dict())
     await product.insert()
     return ProductResponse.from_orm(product)
 
-@router.get("/{product_id}", response_model=ProductResponse, status_code=200)
-async def get_product(
-    product_id: PydanticObjectId,
-):
-    """Get product details by ID."""
-    product = await Product.get(product_id)
-    if not product:
-        raise NotFoundException(detail="Product not found")
-    return ProductResponse.from_orm(product
-)
+
 
 ## list products with pagination
 @router.get("/", response_model=ProductList, status_code=200)
@@ -58,6 +51,16 @@ async def list_products(
         size=size,
     )
 
+@router.get("/{product_id}", response_model=ProductResponse, status_code=200)
+async def get_product(
+    product_id: PydanticObjectId,
+):
+    """Get product details by ID."""
+    product = await Product.get(product_id)
+    if not product:
+        raise NotFoundException(detail="Product not found")
+    return ProductResponse.from_orm(product
+)
 ## update product
 @router.put("/{product_id}", response_model=ProductResponse, status_code=200)
 async def update_product(
@@ -79,7 +82,8 @@ async def update_product(
 async def delete_product(
     product_id: PydanticObjectId,
 ):
-    product = await Product.delete(product_id)
+    product = await Product.get(product_id)
     if not product:
         raise NotFoundException(detail="Product not found")
-    return ProductResponse.from_orm(product)
+    await product.delete()
+    return {"message" : "Product deleted" }

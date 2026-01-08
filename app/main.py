@@ -4,7 +4,7 @@ from app.database import init_db
 from app.config import get_settings
 
 # Import routers
-from app.routers import auth
+from app.routers import auth, product
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -28,7 +28,7 @@ app = FastAPI(
 # Register routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 # app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-# app.include_router(products.router, prefix="/api/v1/products", tags=["Products"])
+app.include_router(product.router, prefix="/api/v1/products", tags=["Products"])
 # app.include_router(cart.router, prefix="/api/v1/cart", tags=["Cart"])
 # app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 

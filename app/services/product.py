@@ -1,6 +1,6 @@
 
-from schemas.product import ProductCreate, ProductUpdate, ProductResponse, ProductList
-from models.product import Product
+from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse, ProductList
+from app.models.product import Product
 
 ## create a product
 async def create_product(product_data: ProductCreate) -> ProductResponse:
