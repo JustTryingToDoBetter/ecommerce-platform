@@ -65,3 +65,4 @@ async def delete_product(product_id: str) -> None:
     
     await product.delete()  ## delete from db
     return ProductResponse.from_orm(product)
+

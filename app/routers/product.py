@@ -1,0 +1,85 @@
+
+
+## post /app/routers/product.py
+from fastapi import APIRouter, HTTPException, Depends, Query
+from typing import Optional
+from beanie import PydanticObjectId
+from app.models.product import Product
+from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse, ProductList
+from app.utils.exceptions import NotFoundException
+from app.models.user import User
+from app.config import get_settings
+settings = get_settings()
+router = APIRouter()
+
+## admin only
+@router.post("/", response_model=ProductResponse, status_code=201)
+async def create_product(
+    product_data: ProductCreate,
+):
+    """Create a new product."""
+    product = Product(**product_data.dict())
+    await product.insert()
+    return ProductResponse.from_orm(product)
+
+@router.get("/{product_id}", response_model=ProductResponse, status_code=200)
+async def get_product(
+    product_id: PydanticObjectId,
+):
+    """Get product details by ID."""
+    product = await Product.get(product_id)
+    if not product:
+        raise NotFoundException(detail="Product not found")
+    return ProductResponse.from_orm(product
+)
+
+## list products with pagination
+@router.get("/", response_model=ProductList, status_code=200)
+async def list_products(
+    page: int = Query(1, ge=1, description="Page number"),
+    size: int = Query(10, ge=1, le=100, description="Number of products per page"),
+    search: Optional[str] = Query(None, description="Search term for product name or description"),
+):
+    """List products with pagination and optional search."""
+    query = {}
+    if search:
+        query = {
+            "$or": [
+                {"name": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+            ]
+        }
+    total = await Product.count_documents(query)
+    products = await Product.find(query).skip((page - 1) * size).limit(size).to_list()
+    return ProductList(
+        products=[ProductResponse.from_orm(prod) for prod in products],
+        total=total,
+        page=page,
+        size=size,
+    )
+
+## update product
+@router.put("/{product_id}", response_model=ProductResponse, status_code=200)
+async def update_product(
+    product_id: PydanticObjectId,
+    product_data: ProductUpdate
+):
+    product = await Product.get(product_id)
+    if not product:
+        raise NotFoundException(detail="Product not found")
+    update_data = product_data.dict(exclude_unset=True) ## only update provided fields
+    for key, value in update_data.items():
+        setattr(product, key, value)
+    await product.save()
+    return ProductResponse.from_orm(product)
+    
+
+## delete product
+@router.delete("/{product_id}", response_model=ProductResponse, status_code=200)
+async def delete_product(
+    product_id: PydanticObjectId,
+):
+    product = await Product.delete(product_id)
+    if not product:
+        raise NotFoundException(detail="Product not found")
+    return ProductResponse.from_orm(product)
