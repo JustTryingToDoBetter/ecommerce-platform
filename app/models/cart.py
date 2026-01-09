@@ -15,8 +15,8 @@ class Cart(Document):
     """Cart document model for MongoDB."""
     user_id: PydanticObjectId
     items: List[CartItem] = []
-    created_at: datetime = datetime.utcnow()
-    updated_at: datetime = datetime.utcnow()
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "carts"
