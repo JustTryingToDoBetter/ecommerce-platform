@@ -2,9 +2,14 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import init_db
 from app.config import get_settings
-
+from slowapi.middleware import SlowAPIMiddleware
 # Import routers
 from app.routers import auth, product, cart, order
+from slowapi import Limiter, get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
+
+limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,7 +29,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Register routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 # app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
