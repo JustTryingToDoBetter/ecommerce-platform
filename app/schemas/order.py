@@ -21,7 +21,7 @@ class OrderItemResponse(BaseModel):
     ## single order itme with product details
     product_id : PydanticObjectId
     name: str
-    description: str
+    quantity: int
     price : float
 ## OrderResponse
 class OrderResponse(BaseModel):
