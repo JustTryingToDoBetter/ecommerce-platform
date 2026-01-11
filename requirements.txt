@@ -5,13 +5,14 @@ python-multipart>=0.0.12
 slowapi==0.1.9
 
 # Database - MongoDB
-motor>=3.6.0
-beanie>=1.27.0
-pymongo>=4.10.0
+motor>=3.3.0,<3.4.0
+beanie>=1.25.0,<1.26.0
+pymongo>=4.6.0,<4.8.0
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt==4.0.1
 pydantic[email]>=2.10.0
 pydantic-settings>=2.6.0
 

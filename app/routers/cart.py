@@ -1,5 +1,5 @@
 ## All endpoints require authentication (user must be logged in)
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from app.schemas.cart import CartItemAdd, CartItemUpdate, CartResponse
 from app.services.cart import get_cart, add_to_cart, update_cart_item, remove_from_cart, clear_cart
 from app.routers.auth import  get_current_user
@@ -20,7 +20,14 @@ async def add_item_to_cart(
     item_data: CartItemAdd,
     current_user=Depends(get_current_user)
 ):
-    return await add_to_cart(current_user.id, item_data)
+    try:
+        return await add_to_cart(current_user.id, item_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 ## Update item in cart
 @router.put("/cart/items", response_model=CartResponse) 
@@ -28,12 +35,17 @@ async def update_item_in_cart(
     item_data: CartItemUpdate,
     current_user=Depends(get_current_user)
 ):
-    return await update_cart_item(current_user.id, item_data)
+    try:
+        return await update_cart_item(current_user.id, item_data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 ## remove item from cart 
-@router.delete("/", response_model=CartResponse)
+@router.delete("/items/{product_id}", response_model=CartResponse)
 async def remove_item_from_cart(
-    product_id: int,
+    product_id: str,
     current_user=Depends(get_current_user)
 ):
     return await remove_from_cart(current_user.id, product_id)

@@ -269,7 +269,7 @@ class TestRemoveFromCart:
     ):
         """Remove item from cart succeeds."""
         response = await client.delete(
-            f"/api/v1/cart/?product_id={test_product.id}",
+            f"/api/v1/cart/items/{test_product.id}",
             headers=auth_headers
         )
         
@@ -284,7 +284,7 @@ class TestRemoveFromCart:
     ):
         """Remove item without authentication returns 401."""
         response = await client.delete(
-            f"/api/v1/cart/?product_id={test_product.id}"
+            f"/api/v1/cart/items/{test_product.id}"
         )
         
         assert response.status_code == 401

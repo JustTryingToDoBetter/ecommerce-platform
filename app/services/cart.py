@@ -1,8 +1,20 @@
 
 import datetime
 from app.models.cart import Cart
-from app.schemas.cart import CartItemAdd, CartItemUpdate, CartResponse
+from app.schemas.cart import CartItemAdd, CartItemUpdate, CartResponse, CartItemResponse
 from app.services.product import get_product
+
+
+def cart_items_to_response(cart_items) -> list[CartItemResponse]:
+    """Convert CartItem models to CartItemResponse schemas."""
+    return [
+        CartItemResponse(
+            product_id=item.product_id,
+            quantity=item.quantity,
+            price=item.price
+        )
+        for item in cart_items
+    ]
 
 
 ## get cart
@@ -11,7 +23,7 @@ async def get_cart(user_id: str) -> CartResponse:
     if not cart:
         return CartResponse(items=[], total_price=0.0)  ## return empty cart if not found
     total_price = sum(item.price * item.quantity for item in cart.items) ## calculate total price
-    return CartResponse(items=cart.items, total_price=total_price) ## return cart response
+    return CartResponse(items=cart_items_to_response(cart.items), total_price=total_price) ## return cart response
 
 ## add item to cart
 async def add_to_cart(user_id: str, item_data: CartItemAdd) -> CartResponse:
@@ -40,7 +52,7 @@ async def add_to_cart(user_id: str, item_data: CartItemAdd) -> CartResponse:
     await cart.save()  ## save cart to db
     
     total_price = sum(item.price * item.quantity for item in cart.items) ## calculate total price
-    return CartResponse(items=cart.items, total_price=total_price) ## return updated cart response
+    return CartResponse(items=cart_items_to_response(cart.items), total_price=total_price) ## return updated cart response
 ## update cart item
 async def update_cart_item(user_id: str, item_data: CartItemUpdate) -> CartResponse:
     cart = await Cart.find_one(Cart.user_id == user_id) ## fetch cart by user_id
@@ -58,28 +70,28 @@ async def update_cart_item(user_id: str, item_data: CartItemUpdate) -> CartRespo
     await cart.save()  ## save cart to db
     
     total_price = sum(item.price * item.quantity for item in cart.items) ## calculate total price
-    return CartResponse(items=cart.items, total_price=total_price) ## return updated cart response
+    return CartResponse(items=cart_items_to_response(cart.items), total_price=total_price) ## return updated cart response
 
 ## remove from cart
-async def remove_from_cart(user_id: str, product_id: int) -> CartResponse:
+async def remove_from_cart(user_id: str, product_id: str) -> CartResponse:
     cart = await Cart.find_one(Cart.user_id == user_id) ## fetch cart by user_id
     if not cart:
-        raise ValueError("Cart not found")  ## raise error if cart not found
+        return CartResponse(items=[], total_price=0.0)  ## return empty cart if not found
     
-    cart.items = [item for item in cart.items if item.product_id != product_id]  ## remove item from cart
+    cart.items = [item for item in cart.items if str(item.product_id) != product_id]  ## remove item from cart
     
     cart.updated_at = datetime.datetime.utcnow()  ## update timestamp
     await cart.save()  ## save cart to db
     
     total_price = sum(item.price * item.quantity for item in cart.items) ## calculate total price
-    return CartResponse(items=cart.items, total_price=total_price) ## return updated cart response
+    return CartResponse(items=cart_items_to_response(cart.items), total_price=total_price) ## return updated cart response
 
 
 ## clear cart
 async def clear_cart(user_id: str) -> CartResponse:
     cart = await Cart.find_one(Cart.user_id == user_id) ## fetch cart by user_id
     if not cart:
-        raise ValueError("Cart not found")  ## raise error if cart not found
+        return CartResponse(items=[], total_price=0.0)  ## return empty cart if not found
     
     cart.items = []  ## clear all items from cart
     

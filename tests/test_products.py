@@ -308,6 +308,8 @@ class TestDeleteProduct:
         response = await client.delete(f"/api/v1/products/{test_product.id}")
         
         assert response.status_code == 200
+        data = response.json()
+        assert "message" in data
         
         # Verify product no longer exists
         get_response = await client.get(f"/api/v1/products/{test_product.id}")

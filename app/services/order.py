@@ -2,7 +2,7 @@ from beanie import PydanticObjectId
 from app.schemas.order import OrderResponse, OrderCreate, OrderItemResponse
 from app.models.order import Order, OrderItem, OrderStatus
 from app.services.cart import get_cart, clear_cart
-from app.services.product import get_product, update_product
+from app.services.product import get_product, update_product_stock
 from typing import List
 
 def build_order_response(order: Order) -> OrderResponse:
@@ -63,7 +63,7 @@ async def create_order(user_id: PydanticObjectId, order_data: OrderCreate) -> Or
     
     # Update stock for each product
     for item in order_items:
-        await update_product(item.product_id, -item.quantity)
+        await update_product_stock(item.product_id, -item.quantity)
     
     # Clear the cart
     await clear_cart(user_id)
@@ -109,7 +109,7 @@ async def cancel_order(order_id : PydanticObjectId):
     
     # Restore stock for each item
     for item in order.items:
-        await update_product(item.product_id, item.quantity)  # Add back stock
+        await update_product_stock(item.product_id, item.quantity)  # Add back stock
     
     order.status = OrderStatus.CANCELLED
     await order.save()

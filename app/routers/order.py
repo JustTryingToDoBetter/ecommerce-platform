@@ -45,14 +45,17 @@ async def get_order_endpoint(
     order_id: PydanticObjectId,
     current_user: User = Depends(get_current_user)
 ):
-    order = await get_order_service(order_id)
+    try:
+        order = await get_order_service(order_id)
+    except Exception as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+    
     if order.user_id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not your order")
-    try:
-        
-        return order
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    
+    return order
 
 
 @router.patch("/{order_id}/status", response_model=OrderResponse, status_code=200)

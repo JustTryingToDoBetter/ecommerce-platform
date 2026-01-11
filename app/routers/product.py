@@ -13,6 +13,21 @@ from app.config import get_settings
 settings = get_settings()
 router = APIRouter()
 
+def product_to_response(product: Product) -> ProductResponse:
+    """Convert Product document to ProductResponse."""
+    return ProductResponse(
+        id=str(product.id),
+        name=product.name,
+        description=product.description,
+        price=product.price,
+        stock=product.stock,
+        category=product.category,
+        tags=product.tags,
+        is_active=product.is_active,
+        created_at=product.created_at,
+        updated_at=product.updated_at
+    )
+
 ## admin only
 @router.post("/", response_model=ProductResponse, status_code=201)
 async def create_product(
@@ -22,7 +37,7 @@ async def create_product(
     """Create a new product."""
     product = Product(**product_data.dict())
     await product.insert()
-    return ProductResponse.from_orm(product)
+    return product_to_response(product)
 
 
 
@@ -34,18 +49,19 @@ async def list_products(
     search: Optional[str] = Query(None, description="Search term for product name or description"),
 ):
     """List products with pagination and optional search."""
-    query = {}
     if search:
-        query = {
-            "$or": [
+        products_query = Product.find(
+            {"$or": [
                 {"name": {"$regex": search, "$options": "i"}},
                 {"description": {"$regex": search, "$options": "i"}},
-            ]
-        }
-    total = await Product.count_documents(query)
-    products = await Product.find(query).skip((page - 1) * size).limit(size).to_list()
+            ]}
+        )
+    else:
+        products_query = Product.find()
+    total = await products_query.count()
+    products = await products_query.skip((page - 1) * size).limit(size).to_list()
     return ProductList(
-        products=[ProductResponse.from_orm(prod) for prod in products],
+        products=[product_to_response(prod) for prod in products],
         total=total,
         page=page,
         size=size,
@@ -59,8 +75,7 @@ async def get_product(
     product = await Product.get(product_id)
     if not product:
         raise NotFoundException(detail="Product not found")
-    return ProductResponse.from_orm(product
-)
+    return product_to_response(product)
 ## update product
 @router.put("/{product_id}", response_model=ProductResponse, status_code=200)
 async def update_product(
@@ -74,11 +89,11 @@ async def update_product(
     for key, value in update_data.items():
         setattr(product, key, value)
     await product.save()
-    return ProductResponse.from_orm(product)
+    return product_to_response(product)
     
 
 ## delete product
-@router.delete("/{product_id}", response_model=ProductResponse, status_code=200)
+@router.delete("/{product_id}", status_code=200)
 async def delete_product(
     product_id: PydanticObjectId,
 ):
@@ -86,4 +101,4 @@ async def delete_product(
     if not product:
         raise NotFoundException(detail="Product not found")
     await product.delete()
-    return {"message" : "Product deleted" }
+    return {"message": "Product deleted"}
