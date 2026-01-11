@@ -1,54 +1,103 @@
-from fastapi import APIRouter, Depends
-from fastapi.security import OAuth2PasswordRequestForm
+from datetime import timedelta
+from typing import Optional
+from beanie import PydanticObjectId
+from fastapi import Depends
+from fastapi.security import OAuth2PasswordBearer
 
-from app.schemas.user import UserCreate, UserResponse, Token
-from app.services.auth import register_user, login_user, get_current_user
 from app.models.user import User
+from app.schemas.user import UserCreate, Token
+from app.utils.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    decode_access_token,
+)
+from app.utils.exceptions import (
+    UnauthorizedException,
+    ConflictException,
+    NotFoundException,
+)
+from app.config import get_settings
 
-router = APIRouter()
+settings = get_settings()
+
+# OAuth2 scheme for token extraction from headers
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
-@router.post("/register", response_model=UserResponse, status_code=201)
-async def register(user_data: UserCreate):
-    """
-    Register a new user.
+async def register_user(user_data: UserCreate) -> User:
+    """Register a new user."""
+    # Check if user already exists
+    existing_user = await User.find_one(User.email == user_data.email)
+    if existing_user:
+        raise ConflictException("User with this email already exists")
     
-    - **email**: Valid email address (must be unique)
-    - **password**: At least 8 characters
-    - **full_name**: Optional display name
-    """
-    user = await register_user(user_data)
-    return UserResponse(
-        id=str(user.id),
-        email=user.email,
-        full_name=user.full_name,
-        is_active=user.is_active,
-        created_at=user.created_at,
+    # Create new user with hashed password
+    user = User(
+        email=user_data.email,
+        hashed_password=get_password_hash(user_data.password),
+        full_name=user_data.full_name,
     )
-
-
-@router.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """
-    Login and get an access token.
+    await user.insert()
     
-    Use the token in the Authorization header: `Bearer <token>`
-    """
-    token = await login_user(form_data.username, form_data.password)
-    return token
+    return user
 
 
-@router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
-    """
-    Get current logged-in user's profile.
+async def authenticate_user(email: str, password: str) -> Optional[User]:
+    """Authenticate user with email and password."""
+    user = await User.find_one(User.email == email)
     
-    Requires authentication.
-    """
-    return UserResponse(
-        id=str(current_user.id),
-        email=current_user.email,
-        full_name=current_user.full_name,
-        is_active=current_user.is_active,
-        created_at=current_user.created_at,
+    if not user:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    
+    return user
+
+
+async def login_user(email: str, password: str) -> Token:
+    """Login user and return JWT token."""
+    user = await authenticate_user(email, password)
+    
+    if not user:
+        raise UnauthorizedException("Incorrect email or password")
+    
+    if not user.is_active:
+        raise UnauthorizedException("User account is disabled")
+    
+    # Create access token
+    access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
     )
+    
+    return Token(access_token=access_token)
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
+    """Get current user from JWT token. Use as a dependency."""
+    payload = decode_access_token(token)
+    
+    if payload is None:
+        raise UnauthorizedException("Invalid or expired token")
+    
+    user_id = payload.get("sub")
+    if user_id is None:
+        raise UnauthorizedException("Invalid token payload")
+    
+    user = await User.get(PydanticObjectId(user_id))
+    
+    if user is None:
+        raise NotFoundException("User not found")
+    
+    if not user.is_active:
+        raise UnauthorizedException("User account is disabled")
+    
+    return user
+
+
+async def get_current_superuser(current_user: User = Depends(get_current_user)) -> User:
+    """Get current superuser. Use as a dependency for admin-only routes."""
+    if not current_user.is_superuser:
+        raise UnauthorizedException("Admin access required")
+    return current_user
