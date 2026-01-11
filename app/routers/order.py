@@ -4,7 +4,7 @@ from app.config import get_settings
 from app.schemas.order import OrderResponse, OrderCreate, OrderList
 from app.models.order import OrderStatus
 from app.models.user import User
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, get_current_superuser
 from app.services.order import (
     create_order as create_order_service,
     get_order as get_order_service,
@@ -45,8 +45,12 @@ async def get_order_endpoint(
     order_id: PydanticObjectId,
     current_user: User = Depends(get_current_user)
 ):
+    order = await get_order_service(order_id)
+    if order.user_id != current_user.id and not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Not your order")
     try:
-        return await get_order_service(order_id)
+        
+        return order
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -55,7 +59,7 @@ async def get_order_endpoint(
 async def update_status_endpoint(
     order_id: PydanticObjectId,
     new_status: OrderStatus,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_superuser)
 ):
     try:
         return await update_order_status(order_id, new_status)
